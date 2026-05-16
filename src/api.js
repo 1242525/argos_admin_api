@@ -36,3 +36,25 @@ export const getAlerts      = () => fetchAPI("/admin/alerts");
 export const getServices    = () => fetchAPI("/admin/services");
 export const getAuditLog    = () => fetchAPI("/admin/audit-log");
 export const getTenants     = () => fetchAPI("/admin/tenants");
+
+export const exportCustomers = async (tenantId = null, fmt = "csv") => {
+  const params = new URLSearchParams({ fmt });
+  if (tenantId) params.append("tenant_id", tenantId);
+  const res = await fetch(`${BASE_URL}/admin/export/customers?${params}`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error(`Export 오류: ${res.status}`);
+  return res.json();
+};
+
+export const exportDevices = async (tenantId = null, fmt = "csv") => {
+  const params = new URLSearchParams({ fmt });
+  if (tenantId) params.append("tenant_id", tenantId);
+  const res = await fetch(`${BASE_URL}/admin/export/devices?${params}`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error(`Export 오류: ${res.status}`);
+  return res.json();
+};

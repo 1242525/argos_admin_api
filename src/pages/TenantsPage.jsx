@@ -2,12 +2,28 @@ import { useState } from "react";
 
 import { useTheme } from "../ThemeContext.jsx";
 import { Card, SectionTitle, FilterBar, Table, Pill } from "../components/UI.jsx";
+import { exportCustomers } from "../api.js";
 
 const TenantsPage = ({ data: DATA }) => {
   const { theme: t } = useTheme();
   const [filter, setFilter] = useState({});
   const [sel, setSel] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportResult, setExportResult] = useState(null);
   const handleF = (k, v) => setFilter(f => ({ ...f, [k]: v }));
+
+  const handleExport = async (fmt = "csv") => {
+    setExporting(true);
+    setExportResult(null);
+    try {
+      const result = await exportCustomers(filter.tenant_id || null, fmt);
+      setExportResult(result);
+    } catch (e) {
+      setExportResult({ error: e.message });
+    } finally {
+      setExporting(false);
+    }
+  };
   let rows = DATA.customers;
   if (filter.tenant_id) rows = rows.filter(r => r.tenant_id === filter.tenant_id);
   if (filter.status)    rows = rows.filter(r => r.account_status === filter.status);
@@ -26,11 +42,57 @@ const TenantsPage = ({ data: DATA }) => {
   return (
     <div style={{ display: "grid", gridTemplateColumns: sel ? "1fr 360px" : "1fr", gap: 16 }}>
       <div>
-        <FilterBar filters={[
-          { key: "search",    label: "Search", type: "text",   placeholder: "username/email" },
-          { key: "tenant_id", label: "Tenant", type: "select", options: DATA.tenants.map(t=>t.tenant_id) },
-          { key: "status",    label: "Status", type: "select", options: ["active","locked","disabled","retired-linked"] },
-        ]} values={filter} onChange={handleF} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+          <FilterBar filters={[
+            { key: "search",    label: "Search", type: "text",   placeholder: "username/email" },
+            { key: "tenant_id", label: "Tenant", type: "select", options: DATA.tenants.map(t=>t.tenant_id) },
+            { key: "status",    label: "Status", type: "select", options: ["active","locked","disabled","retired-linked"] },
+          ]} values={filter} onChange={handleF} />
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button onClick={() => handleExport("csv")} disabled={exporting} style={{
+              background: exporting ? t.borderSub : "#1a2e1a", border: "1px solid #22c55e",
+              color: "#22c55e", borderRadius: 8, padding: "6px 14px",
+              fontSize: "0.75rem", fontWeight: 600, cursor: exporting ? "not-allowed" : "pointer",
+              fontFamily: "inherit", letterSpacing: "0.04em",
+            }}>
+              {exporting ? "..." : "↓ CSV"}
+            </button>
+            <button onClick={() => handleExport("json")} disabled={exporting} style={{
+              background: exporting ? t.borderSub : "#1a1a2e", border: "1px solid #3b82f6",
+              color: "#3b82f6", borderRadius: 8, padding: "6px 14px",
+              fontSize: "0.75rem", fontWeight: 600, cursor: exporting ? "not-allowed" : "pointer",
+              fontFamily: "inherit", letterSpacing: "0.04em",
+            }}>
+              {exporting ? "..." : "↓ JSON"}
+            </button>
+          </div>
+        </div>
+        {exportResult && (
+          <div style={{
+            background: exportResult.error ? "#2d0a0a" : "#0a1a0a",
+            border: `1px solid ${exportResult.error ? "#6b1a1a" : "#22c55e"}`,
+            borderRadius: 10, padding: "12px 16px", marginBottom: 12,
+            fontSize: "0.75rem",
+          }}>
+            {exportResult.error ? (
+              <span style={{ color: "#ff4d4d" }}>Export 실패: {exportResult.error}</span>
+            ) : (
+              <div style={{ display: "flex", gap: 20, flexWrap: "wrap", color: t.text }}>
+                <span style={{ color: "#22c55e" }}>Export 완료</span>
+                <span style={{ color: t.textDim }}>레코드: <b style={{ color: t.text }}>{exportResult.record_count}</b></span>
+                <span style={{ color: t.textDim }}>파일: <b style={{ color: t.textAccent }}>{exportResult.filename}</b></span>
+                {exportResult.minio_url && (
+                  <a href={exportResult.minio_url} target="_blank" rel="noreferrer"
+                    style={{ color: "#3b82f6" }}>MinIO 링크</a>
+                )}
+                {exportResult.download_url && (
+                  <a href={`http://localhost:8001${exportResult.download_url}`}
+                    style={{ color: "#f59e0b" }}>다운로드</a>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         <Card style={{ padding: 0 }}><Table cols={cols} rows={rows} /></Card>
       </div>
       {sel && (
