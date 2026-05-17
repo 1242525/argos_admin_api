@@ -142,6 +142,8 @@ const AuthGate = () => {
   const handleLogin  = () => setAuthed(true);
   const handleLogout = () => {
     localStorage.removeItem("admin_token");
+    localStorage.removeItem("admin_username");
+    localStorage.removeItem("admin_role");
     setAuthed(false);
   };
 

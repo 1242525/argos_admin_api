@@ -19,6 +19,8 @@ const LoginPage = ({ onLogin }) => {
       const token = data.access_token || data.token;
       if (!token) throw new Error("토큰을 받지 못했습니다");
       localStorage.setItem("admin_token", token);
+      localStorage.setItem("admin_username", data.username || username);
+      localStorage.setItem("admin_role", data.role || "");
       onLogin();
     } catch (err) {
       setError(err.message || "로그인 실패");
