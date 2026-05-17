@@ -9,9 +9,11 @@
 | 계정 | 비밀번호 | role | 비고 |
 |---|---|---|---|
 | admin | (기존) | admin | 원래 있던 계정 |
-| firmware-admin | firmware123! | admin | 낚시용 (VPN MFA로 막힘) |
-| deploy-bot | deploy123! | operator | 핵심 공격 대상 계정 |
-| ops-monitor | monitor123! | viewer | 읽기 전용 |
+| firmware-admin | FwAdm1n@2024! | admin | 낚시용 (VPN MFA로 막힘) |
+| deploy-bot | d3pl0y-B0t@secure | operator | 핵심 공격 대상 계정 |
+| ops-monitor | 0ps!M0nitor#9 | viewer | 읽기 전용 |
+
+> 비밀번호는 VPN 크리덴셜과 동일하게 설정되어 있음 → 추가 취약점
 
 ---
 
@@ -24,6 +26,40 @@
 | export (CSV/JSON) | O | O | X (403) | X (401) |
 | alert 수정 PATCH | O | O | O | X (401) |
 | OTA 배포 POST | O | O | O | X (401) |
+
+---
+
+### export 사용 조건
+
+```
+VPN만 접속:
+→ 내부망 진입
+→ /docs 접근 가능 (엔드포인트 확인 가능)
+→ export 호출 → 401 (JWT 없음)
+
+VPN + Admin API 로그인:
+→ JWT 발급
+→ export 호출 → 200 OK (operator 이상)
+→ export 호출 → 403 (viewer)
+```
+
+즉 export 기능은 **VPN 접속 + Admin API 로그인** 두 가지가 모두 필요.
+
+---
+
+### VPN 크리덴셜 vs Admin API 로그인 차이
+
+```
+VPN 크리덴셜 (argos-dmz OpenVPN):
+→ 내부망에 들어오기 위한 문
+→ "건물 출입증"
+
+Admin API 로그인 (staff_accounts DB):
+→ 관리자 페이지 사용을 위한 인증
+→ "사무실 내 시스템 로그인"
+```
+
+시나리오에서 두 시스템에 같은 비밀번호를 사용 → GitHub에서 credential 하나 탈취하면 둘 다 뚫림.
 
 ---
 
@@ -42,7 +78,7 @@ ops-monitor:
 → 조회만 가능, export 불가 (403)
 
 deploy-bot:
-→ VPN 성공 (MFA 없음)          ← GitHub credential 탈취
+→ VPN 성공 (MFA 없음)              ← GitHub credential 탈취
 → Admin 로그인 가능 (role: operator)
 → export 가능
 → tenant_id 없이 요청 → 전체 테넌트 데이터 유출  ← 취약점
@@ -56,7 +92,7 @@ deploy-bot:
 
 ```
 ① GitHub git log에서 deploy-bot credential 발견
-   VPN_USER=deploy-bot / VPN_PASS=deploy123!
+   VPN_USER=deploy-bot / VPN_PASS=d3pl0y-B0t@secure
 
 ② VPN 로그인 성공 (MFA 없음)
    → 내부망 진입
@@ -65,6 +101,7 @@ deploy-bot:
    → export 엔드포인트 발견
 
 ④ /auth/admin/login 으로 JWT 발급
+   username: deploy-bot / password: d3pl0y-B0t@secure (VPN과 동일)
    → role: operator
 
 ⑤ POST /admin/export/customers (tenant_id 없음)
@@ -83,6 +120,10 @@ OWASP A01: Broken Access Control
 → operator 계정이 전체 테넌트 데이터 export 가능
 → 테넌트 간 데이터 격리 없음
 → tenant_id 소유권 검증 없음
+
+추가 취약점:
+→ VPN과 Admin API 동일 비밀번호 사용
+→ credential 하나 탈취로 두 시스템 모두 접근 가능
 ```
 
 ---
@@ -102,10 +143,11 @@ OWASP A01: Broken Access Control
 ### routers/export.py
 
 ```
-인증:    JWT 필요 (없으면 401)
+인증:      JWT 필요 (없으면 401)
+           → VPN만으로는 export 불가, Admin 로그인 필요
 role 체크: operator, admin만 export 가능 (viewer는 403)
-취약점:  tenant_id 소유권 검증 없음 → 전체 데이터 export 가능
-MinIO:   export 시 자동 업로드, 공개 URL 반환
+취약점:    tenant_id 소유권 검증 없음 → 전체 데이터 export 가능
+MinIO:     export 시 자동 업로드, 공개 URL 반환
 ```
 
 ---

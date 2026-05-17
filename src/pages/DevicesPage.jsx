@@ -24,6 +24,18 @@ const DevicesPage = ({ data: DATA }) => {
       setExporting(false);
     }
   };
+
+  const handleDownload = async (downloadUrl, filename) => {
+    const token = localStorage.getItem("admin_token");
+    const res = await fetch(`http://localhost:8001${downloadUrl}`, {
+      headers: { "Authorization": `Bearer ${token}` },
+    });
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+  };
   let rows = DATA.devices;
   if (filter.tenant_id) rows = rows.filter(r => r.tenant_id === filter.tenant_id);
   if (filter.status)    rows = rows.filter(r => r.device_status === filter.status);
@@ -83,8 +95,8 @@ const DevicesPage = ({ data: DATA }) => {
                     style={{ color: "#3b82f6" }}>MinIO 링크</a>
                 )}
                 {exportResult.download_url && (
-                  <a href={`http://localhost:8001${exportResult.download_url}`}
-                    style={{ color: "#f59e0b" }}>다운로드</a>
+                  <span onClick={() => handleDownload(exportResult.download_url, exportResult.filename)}
+                    style={{ color: "#f59e0b", cursor: "pointer" }}>다운로드</span>
                 )}
               </div>
             )}

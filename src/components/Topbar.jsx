@@ -4,6 +4,8 @@ import { useTheme } from "../ThemeContext.jsx";
 const Topbar = ({ page, onLogout }) => {
   const { theme: t, mode, toggle } = useTheme();
   const navItem = NAV_ITEMS.find(n => n.id === page);
+  const username = localStorage.getItem("admin_username") || "admin";
+  const initial = username.charAt(0).toUpperCase();
 
   return (
     <header style={{
@@ -53,8 +55,8 @@ const Topbar = ({ page, onLogout }) => {
             background: t.gradient,
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: "0.7rem", fontWeight: 700, color: "#fff",
-          }}>O</div>
-          <span style={{ fontSize: "0.78rem", color: t.text, fontWeight: 600 }}>ops01</span>
+          }}>{initial}</div>
+          <span style={{ fontSize: "0.78rem", color: t.text, fontWeight: 600 }}>{username}</span>
         </div>
 
         {/* 로그아웃 */}
