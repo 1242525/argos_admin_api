@@ -5,6 +5,7 @@ import { StatCard, Card, SectionTitle, SevBadge, Pill } from "../components/UI.j
 
 const OverviewPage = ({ data: DATA }) => {
   const { theme: t } = useTheme();
+  const username = localStorage.getItem("admin_username") || "admin";
   const openAlerts = DATA.alerts.filter(a => a.status === "open").length;
   const svcStatus = [
     "API Gateway","Auth Service","Customer API","Device API",
@@ -15,7 +16,7 @@ const OverviewPage = ({ data: DATA }) => {
       {/* 인사말 */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ margin: 0, fontSize: "1.6rem", fontWeight: 800, color: t.textTitle, letterSpacing: "-0.02em" }}>
-          안녕하세요, ops01 👋
+          안녕하세요, {username} 👋
         </h1>
         <p style={{ margin: "4px 0 0", color: t.textMuted, fontSize: "0.85rem" }}>
           Argos 관리 콘솔 · 오늘의 시스템 현황입니다.
