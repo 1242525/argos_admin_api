@@ -3,6 +3,8 @@ import { useTheme } from "../ThemeContext.jsx";
 
 const Sidebar = ({ page, setPage, navOpen, setNavOpen, alertCount = 0 }) => {
   const { theme: t } = useTheme();
+  const role = localStorage.getItem("admin_role");
+  const visibleItems = NAV_ITEMS.filter(n => !n.adminOnly || role === "admin");
 
   return (
     <aside style={{
@@ -35,7 +37,7 @@ const Sidebar = ({ page, setPage, navOpen, setNavOpen, alertCount = 0 }) => {
       </div>
 
       <nav style={{ flex: 1, padding: "12px 10px" }}>
-        {NAV_ITEMS.map(n => {
+        {visibleItems.map(n => {
           const active = page === n.id;
           return (
             <button key={n.id} onClick={() => setPage(n.id)} style={{

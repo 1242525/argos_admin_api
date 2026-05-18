@@ -13,6 +13,8 @@ export const NAV_ITEMS = [
   { id: "alerts",    icon: "⚠", label: "Alerts" },
   { id: "system",    icon: "◫", label: "System Inventory" },
   { id: "audit",     icon: "⌘", label: "Audit / Change" },
+  { id: "payments",     icon: "₩", label: "Payment Info",  adminOnly: true },
+  { id: "transactions", icon: "↔", label: "Transactions",  adminOnly: true },
 ];
 
 export const SEV_COLOR = {

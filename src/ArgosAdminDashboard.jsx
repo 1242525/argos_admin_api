@@ -14,12 +14,14 @@ import IdentityPage  from "./pages/IdentityPage.jsx";
 import LogsPage      from "./pages/LogsPage.jsx";
 import AlertsPage    from "./pages/AlertsPage.jsx";
 import SystemPage    from "./pages/SystemPage.jsx";
-import AuditPage     from "./pages/AuditPage.jsx";
+import AuditPage         from "./pages/AuditPage.jsx";
+import PaymentInfoPage   from "./pages/PaymentInfoPage.jsx";
+import TransactionsPage  from "./pages/TransactionsPage.jsx";
 
 import {
   getCustomers, getDevices, getMediaEvents, getOta,
   getStaff, getAccessLogs, getAlerts, getServices,
-  getAuditLog, getTenants,
+  getAuditLog, getTenants, getPaymentInfo, getTransactions,
 } from "./api.js";
 
 const Spinner = ({ t }) => (
@@ -69,7 +71,9 @@ const PAGE_MAP = {
   logs:     LogsPage,
   alerts:   AlertsPage,
   system:   SystemPage,
-  audit:    AuditPage,
+  audit:        AuditPage,
+  payments:     PaymentInfoPage,
+  transactions: TransactionsPage,
 };
 
 const AppInner = ({ onLogout }) => {
@@ -87,13 +91,13 @@ const AppInner = ({ onLogout }) => {
       const [
         customers, devices, mediaEvents, ota,
         staffAccounts, accessLogs, alerts, services,
-        auditLog, tenants,
+        auditLog, tenants, paymentInfo, transactions,
       ] = await Promise.all([
         getCustomers(), getDevices(), getMediaEvents(), getOta(),
         getStaff(), getAccessLogs(), getAlerts(), getServices(),
-        getAuditLog(), getTenants(),
+        getAuditLog(), getTenants(), getPaymentInfo(), getTransactions(),
       ]);
-      setApiData({ customers, devices, mediaEvents, ota, staffAccounts, accessLogs, alerts, services, auditLog, tenants });
+      setApiData({ customers, devices, mediaEvents, ota, staffAccounts, accessLogs, alerts, services, auditLog, tenants, paymentInfo, transactions });
     } catch (err) {
       setError(err.message || "데이터 로딩 실패");
     } finally {
@@ -108,7 +112,32 @@ const AppInner = ({ onLogout }) => {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  const role = localStorage.getItem("admin_role");
+  const adminOnlyPages = ["payments", "transactions"];
   const PageComponent = PAGE_MAP[page];
+
+  if (adminOnlyPages.includes(page) && role !== "admin") {
+    return (
+      <div style={{
+        fontFamily: "'IBM Plex Mono', 'Courier New', monospace",
+        background: t.bg, color: t.text, minHeight: "100vh",
+        display: "flex", fontSize: "13px",
+      }}>
+        <Sidebar page={page} setPage={setPage} navOpen={navOpen} setNavOpen={setNavOpen}
+          alertCount={apiData ? apiData.alerts.filter(a => a.status === "open").length : 0} />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <Topbar page={page} onLogout={onLogout} />
+          <main style={{ flex: 1, padding: "24px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ textAlign: "center", color: t.textMuted }}>
+              <div style={{ fontSize: "2rem", marginBottom: 12 }}>⊘</div>
+              <div style={{ fontSize: "0.9rem", fontWeight: 700, color: t.textDim }}>접근 권한 없음</div>
+              <div style={{ fontSize: "0.75rem", marginTop: 6 }}>admin 계정만 접근할 수 있습니다.</div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -122,7 +151,7 @@ const AppInner = ({ onLogout }) => {
   alertCount={apiData ? apiData.alerts.filter(a => a.status === "open").length : 0}
 />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <Topbar page={page} onLogout={onLogout} />
+        <Topbar page={page} onLogout={onLogout} onRefresh={fetchAll} />
         <main style={{ flex: 1, padding: "24px", overflowY: "auto" }}>
           {error && <ErrorBanner message={error} onRetry={fetchAll} t={t} />}
           {loading ? (

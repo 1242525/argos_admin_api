@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:8001";
+const BASE_URL = "http://10.10.3.2:8001";
 const getToken = () => localStorage.getItem("admin_token");
 
 const fetchAPI = async (endpoint) => {
@@ -35,7 +35,9 @@ export const getAccessLogs  = () => fetchAPI("/admin/access-logs");
 export const getAlerts      = () => fetchAPI("/admin/alerts");
 export const getServices    = () => fetchAPI("/admin/services");
 export const getAuditLog    = () => fetchAPI("/admin/audit-log");
-export const getTenants     = () => fetchAPI("/admin/tenants");
+export const getTenants      = () => fetchAPI("/admin/tenants");
+export const getPaymentInfo  = () => fetchAPI("/admin/payment-info");
+export const getTransactions = () => fetchAPI("/admin/transactions");
 
 export const exportCustomers = async (tenantId = null, fmt = "csv") => {
   const params = new URLSearchParams({ fmt });
