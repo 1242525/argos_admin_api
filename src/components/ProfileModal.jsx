@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTheme } from "../ThemeContext.jsx";
 
-const BASE_URL = "http://localhost:8001";
+const BASE_URL = "http://10.10.3.2:8001";
 
 const ProfileModal = ({ onClose, onUpdated }) => {
   const { theme: t } = useTheme();

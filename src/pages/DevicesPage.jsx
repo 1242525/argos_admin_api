@@ -27,7 +27,7 @@ const DevicesPage = ({ data: DATA }) => {
 
   const handleDownload = async (downloadUrl, filename) => {
     const token = localStorage.getItem("admin_token");
-    const res = await fetch(`http://localhost:8001${downloadUrl}`, {
+    const res = await fetch(`http://10.10.3.2:8001${downloadUrl}`, {
       headers: { "Authorization": `Bearer ${token}` },
     });
     const blob = await res.blob();
