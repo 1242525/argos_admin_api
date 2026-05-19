@@ -39,6 +39,28 @@ export const getTenants      = () => fetchAPI("/admin/tenants");
 export const getPaymentInfo  = () => fetchAPI("/admin/payment-info");
 export const getTransactions = () => fetchAPI("/admin/transactions");
 
+export const exportPaymentInfo = async (tenantId = null, fmt = "csv") => {
+  const params = new URLSearchParams({ fmt });
+  if (tenantId) params.append("tenant_id", tenantId);
+  const res = await fetch(`${BASE_URL}/admin/export/payment-info?${params}`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error(`Export 오류: ${res.status}`);
+  return res.json();
+};
+
+export const exportTransactions = async (tenantId = null, fmt = "csv") => {
+  const params = new URLSearchParams({ fmt });
+  if (tenantId) params.append("tenant_id", tenantId);
+  const res = await fetch(`${BASE_URL}/admin/export/transactions?${params}`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error(`Export 오류: ${res.status}`);
+  return res.json();
+};
+
 export const exportCustomers = async (tenantId = null, fmt = "csv") => {
   const params = new URLSearchParams({ fmt });
   if (tenantId) params.append("tenant_id", tenantId);

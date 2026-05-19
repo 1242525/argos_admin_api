@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useTheme } from "../ThemeContext.jsx";
 import { Card, SectionTitle, FilterBar, Table, Pill } from "../components/UI.jsx";
+import { exportTransactions } from "../api.js";
+
+const BASE_URL = "http://10.10.3.2:8001";
 
 const TYPE_COLOR = {
   device_purchase: { bg: "#001a3a", text: "#4db8ff", border: "#004466" },
@@ -23,9 +26,36 @@ const TypeBadge = ({ type }) => {
 
 const TransactionsPage = ({ data: DATA }) => {
   const { theme: t } = useTheme();
-  const [filter, setFilter] = useState({});
-  const [sel, setSel] = useState(null);
+  const [filter, setFilter]             = useState({});
+  const [sel, setSel]                   = useState(null);
+  const [exporting, setExporting]       = useState(false);
+  const [exportResult, setExportResult] = useState(null);
   const handleF = (k, v) => setFilter(f => ({ ...f, [k]: v }));
+
+  const handleExport = async (fmt = "csv") => {
+    setExporting(true);
+    setExportResult(null);
+    try {
+      const result = await exportTransactions(filter.tenant_id || null, fmt);
+      setExportResult(result);
+    } catch (e) {
+      setExportResult({ error: e.message });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleDownload = async (downloadUrl, filename) => {
+    const token = localStorage.getItem("admin_token");
+    const res = await fetch(`${BASE_URL}${downloadUrl}`, {
+      headers: { "Authorization": `Bearer ${token}` },
+    });
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+  };
 
   let rows = DATA.transactions || [];
   if (filter.tenant_id)    rows = rows.filter(r => r.tenant_id === filter.tenant_id);
@@ -60,22 +90,59 @@ const TransactionsPage = ({ data: DATA }) => {
   return (
     <div style={{ display: "grid", gridTemplateColumns: sel ? "1fr 380px" : "1fr", gap: 16 }}>
       <div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
           <FilterBar filters={[
             { key: "search",       label: "Search",  type: "text",   placeholder: "TXN ID / Customer" },
             { key: "tenant_id",    label: "Tenant",  type: "select", options: (DATA.tenants || []).map(t => t.tenant_id) },
             { key: "product_type", label: "Type",    type: "select", options: ["device_purchase","installation","subscription","storage"] },
             { key: "status",       label: "Status",  type: "select", options: ["success","refunded"] },
           ]} values={filter} onChange={handleF} />
-          <div style={{ display: "flex", gap: 20, fontSize: "0.75rem" }}>
-            <span style={{ color: t.textDim }}>
-              건수: <b style={{ color: t.text }}>{rows.length}</b>
-            </span>
-            <span style={{ color: t.textDim }}>
-              합계: <b style={{ color: "#22c55e" }}>{totalAmount.toLocaleString()}원</b>
-            </span>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => handleExport("csv")} disabled={exporting} style={{
+                background: exporting ? t.borderSub : "#1a2e1a", border: "1px solid #22c55e",
+                color: "#22c55e", borderRadius: 8, padding: "6px 14px",
+                fontSize: "0.75rem", fontWeight: 600, cursor: exporting ? "not-allowed" : "pointer",
+                fontFamily: "inherit",
+              }}>{exporting ? "..." : "↓ CSV"}</button>
+              <button onClick={() => handleExport("json")} disabled={exporting} style={{
+                background: exporting ? t.borderSub : "#1a1a2e", border: "1px solid #3b82f6",
+                color: "#3b82f6", borderRadius: 8, padding: "6px 14px",
+                fontSize: "0.75rem", fontWeight: 600, cursor: exporting ? "not-allowed" : "pointer",
+                fontFamily: "inherit",
+              }}>{exporting ? "..." : "↓ JSON"}</button>
+            </div>
+            <div style={{ display: "flex", gap: 20, fontSize: "0.75rem" }}>
+              <span style={{ color: t.textDim }}>건수: <b style={{ color: t.text }}>{rows.length}</b></span>
+              <span style={{ color: t.textDim }}>합계: <b style={{ color: "#22c55e" }}>{totalAmount.toLocaleString()}원</b></span>
+            </div>
           </div>
         </div>
+
+        {exportResult && (
+          <div style={{
+            background: exportResult.error ? "#2d0a0a" : "#0a1a0a",
+            border: `1px solid ${exportResult.error ? "#6b1a1a" : "#22c55e"}`,
+            borderRadius: 10, padding: "12px 16px", marginBottom: 12, fontSize: "0.75rem",
+          }}>
+            {exportResult.error ? (
+              <span style={{ color: "#ff4d4d" }}>Export 실패: {exportResult.error}</span>
+            ) : (
+              <div style={{ display: "flex", gap: 20, flexWrap: "wrap", color: t.text }}>
+                <span style={{ color: "#22c55e" }}>Export 완료</span>
+                <span style={{ color: t.textDim }}>레코드: <b style={{ color: t.text }}>{exportResult.record_count}</b></span>
+                <span style={{ color: t.textDim }}>파일: <b style={{ color: t.textAccent }}>{exportResult.filename}</b></span>
+                {exportResult.minio_url && (
+                  <a href={exportResult.minio_url} target="_blank" rel="noreferrer" style={{ color: "#3b82f6" }}>MinIO 링크</a>
+                )}
+                {exportResult.download_url && (
+                  <span onClick={() => handleDownload(exportResult.download_url, exportResult.filename)}
+                    style={{ color: "#f59e0b", cursor: "pointer" }}>다운로드</span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         <Card style={{ padding: 0 }}>
           <Table cols={cols} rows={rows} />
         </Card>

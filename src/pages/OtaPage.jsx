@@ -33,7 +33,7 @@ const OtaPage = ({ data: DATA }) => {
       formData.append("approved_by", form.approved_by);
       if (file) formData.append("firmware_file", file);
 
-      const res = await fetch("http://localhost:8001/admin/ota", {
+      const res = await fetch("http://10.10.3.2:8001/admin/ota", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
