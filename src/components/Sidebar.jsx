@@ -1,9 +1,10 @@
 import { NAV_ITEMS } from "../constants.js";
 import { useTheme } from "../ThemeContext.jsx";
+import { getAdminSession } from "../authSession.js";
 
 const Sidebar = ({ page, setPage, navOpen, setNavOpen, alertCount = 0 }) => {
   const { theme: t } = useTheme();
-  const role = localStorage.getItem("admin_role");
+  const { role } = getAdminSession();
   const visibleItems = NAV_ITEMS.filter(n => !n.adminOnly || role === "admin");
 
   return (

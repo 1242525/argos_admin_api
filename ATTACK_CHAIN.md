@@ -61,7 +61,7 @@ ROLE=deploy
 `.ovpn` 파일 + credential로 접속:
 
 ```bash
-sudo openvpn ~/deploy-bot.ovpn
+sudo openvpn ~/deploy-bot.ovpn (git log에 같이 심어둘 예정)
 # username: deploy-bot
 # password: d3pl0y-B0t@secure
 ```
@@ -294,5 +294,5 @@ cs@argos-iot.co.kr
 | 계정 | VPN | Admin 로그인 | export | 권한 상승 | 결제 데이터 |
 |---|---|---|---|---|---|
 | firmware-admin | 실패 (MFA) | X | X | X | X |
-| ops-monitor | 성공 | O (developer) | X | X | X |
+| ops-monitor | 성공 | X (developer → 로그인 차단) | X | X | X |
 | **deploy-bot** | **성공** | **O (operator→admin)** | **O** | **O** | **O ← 정답** |

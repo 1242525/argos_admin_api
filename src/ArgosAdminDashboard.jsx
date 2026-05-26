@@ -17,6 +17,7 @@ import SystemPage    from "./pages/SystemPage.jsx";
 import AuditPage         from "./pages/AuditPage.jsx";
 import PaymentInfoPage   from "./pages/PaymentInfoPage.jsx";
 import TransactionsPage  from "./pages/TransactionsPage.jsx";
+import { getAdminSession } from "./authSession.js";
 
 import {
   getCustomers, getDevices, getMediaEvents, getOta,
@@ -112,7 +113,7 @@ const AppInner = ({ onLogout }) => {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const role = localStorage.getItem("admin_role");
+  const { role } = getAdminSession();
   const adminOnlyPages = ["payments", "transactions"];
   const PageComponent = PAGE_MAP[page];
 
