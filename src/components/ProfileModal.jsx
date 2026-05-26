@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useTheme } from "../ThemeContext.jsx";
+import { getAdminSession, syncAdminSessionFromToken } from "../authSession.js";
 
 const BASE_URL = "http://10.10.3.2:8001";
 
 const ProfileModal = ({ onClose, onUpdated }) => {
   const { theme: t } = useTheme();
-  const username = localStorage.getItem("admin_username") || "";
-  const role     = localStorage.getItem("admin_role") || "";
+  const { username, role } = getAdminSession();
 
   const [newUsername, setNewUsername] = useState(username);
   const [loading, setLoading]         = useState(false);
@@ -28,6 +28,7 @@ const ProfileModal = ({ onClose, onUpdated }) => {
       });
       if (!res.ok) throw new Error(`오류: ${res.status}`);
       localStorage.setItem("admin_username", newUsername);
+      syncAdminSessionFromToken();
       setSuccess("저장되었습니다");
       if (onUpdated) onUpdated();
     } catch (err) {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTheme } from "../ThemeContext.jsx";
 import { login } from "../api.js";
+import { syncAdminSessionFromToken } from "../authSession.js";
 
 const LoginPage = ({ onLogin }) => {
   const { theme: t } = useTheme();
@@ -20,7 +21,8 @@ const LoginPage = ({ onLogin }) => {
       if (!token) throw new Error("토큰을 받지 못했습니다");
       localStorage.setItem("admin_token", token);
       localStorage.setItem("admin_username", data.username || username);
-      localStorage.setItem("admin_role", data.role || "");
+      if (data.role) localStorage.setItem("admin_role", data.role);
+      syncAdminSessionFromToken();
       onLogin();
     } catch (err) {
       setError(err.message || "로그인 실패");

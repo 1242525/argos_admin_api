@@ -2,11 +2,12 @@ import { useState, useRef, useEffect } from "react";
 import { NAV_ITEMS } from "../constants.js";
 import { useTheme } from "../ThemeContext.jsx";
 import ProfileModal from "./ProfileModal.jsx";
+import { getAdminSession } from "../authSession.js";
 
 const Topbar = ({ page, onLogout, onRefresh }) => {
   const { theme: t, mode, toggle } = useTheme();
   const navItem  = NAV_ITEMS.find(n => n.id === page);
-  const username = localStorage.getItem("admin_username") || "admin";
+  const { username, role } = getAdminSession();
   const initial  = username.charAt(0).toUpperCase();
 
   const [dropOpen, setDropOpen]     = useState(false);
@@ -98,7 +99,7 @@ const Topbar = ({ page, onLogout, onRefresh }) => {
                 }}>
                   <div style={{ fontSize: "0.78rem", fontWeight: 700, color: t.text }}>{username}</div>
                   <div style={{ fontSize: "0.65rem", color: t.textFaint, marginTop: 2 }}>
-                    {localStorage.getItem("admin_role")}
+                    {role}
                   </div>
                 </div>
 
