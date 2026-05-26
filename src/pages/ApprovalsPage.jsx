@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTheme } from "../ThemeContext.jsx";
 import { Card, SectionTitle } from "../components/UI.jsx";
-import { getPaymentExportRequests, approvePaymentExport } from "../api.js";
+import { getPaymentExportRequests, approvePaymentExport, getTransactionsExportRequests, approveTransactionsExport } from "../api.js";
 
 const BASE_URL = "http://10.10.3.2:8001";
 
@@ -11,12 +11,19 @@ const ApprovalsPage = () => {
   const [loading, setLoading]     = useState(true);
   const [approving, setApproving] = useState(null);
   const [results, setResults]     = useState({});
+  const [txRequests, setTxRequests] = useState([]);
+  const [txApproving, setTxApproving] = useState(null);
+  const [txResults, setTxResults]   = useState({});
 
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      const data = await getPaymentExportRequests();
-      setRequests(data);
+      const [payData, txData] = await Promise.all([
+        getPaymentExportRequests(),
+        getTransactionsExportRequests(),
+      ]);
+      setRequests(payData);
+      setTxRequests(txData);
     } catch (e) {
       console.error(e);
     } finally {
@@ -49,6 +56,19 @@ const ApprovalsPage = () => {
     a.href = URL.createObjectURL(blob);
     a.download = filename;
     a.click();
+  };
+
+  const handleTxApprove = async (requestId) => {
+    setTxApproving(requestId);
+    try {
+      const result = await approveTransactionsExport(requestId);
+      setTxResults(r => ({ ...r, [requestId]: result }));
+      fetchRequests();
+    } catch (e) {
+      setTxResults(r => ({ ...r, [requestId]: { error: e.message } }));
+    } finally {
+      setTxApproving(null);
+    }
   };
 
   const pending  = requests.filter(r => r.status === "pending");
@@ -148,6 +168,89 @@ const ApprovalsPage = () => {
                     <span style={{ color: t.textDim }}>파일: <b style={{ color: t.textAccent }}>{results[req.request_id].filename}</b></span>
                     <span
                       onClick={() => handleDownload(results[req.request_id].download_url, results[req.request_id].filename)}
+                      style={{ color: "#f59e0b", cursor: "pointer", fontWeight: 600 }}
+                    >↓ 다운로드</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </Card>
+
+
+      {/* Transactions 승인 */}
+      <Card style={{ marginBottom: 16 }}>
+        <SectionTitle>
+          거래 데이터 승인 대기
+          {txRequests.filter(r => r.status === "pending").length > 0 && (
+            <span style={{
+              marginLeft: 8, background: "#ef4444", color: "#fff",
+              borderRadius: 20, padding: "1px 8px",
+              fontSize: "0.65rem", fontWeight: 700,
+            }}>{txRequests.filter(r => r.status === "pending").length}</span>
+          )}
+        </SectionTitle>
+        {loading ? (
+          <div style={{ color: t.textMuted, fontSize: "0.8rem", padding: "12px 0" }}>로딩 중...</div>
+        ) : txRequests.filter(r => r.status === "pending").length === 0 ? (
+          <div style={{ color: t.textMuted, fontSize: "0.8rem", padding: "12px 0" }}>대기 중인 요청이 없습니다.</div>
+        ) : txRequests.filter(r => r.status === "pending").map(req => (
+          <div key={req.request_id} style={{
+            border: `1px solid ${t.border}`, borderRadius: 10,
+            padding: "14px 16px", marginBottom: 10, background: t.bgCard,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 6 }}>
+                  <span style={{ fontSize: "0.7rem", color: t.textFaint }}>#{req.request_id}</span>
+                  <span style={{
+                    background: "#2a1500", border: "1px solid #f59e0b",
+                    color: "#f59e0b", borderRadius: 6, padding: "1px 8px",
+                    fontSize: "0.65rem", fontWeight: 700,
+                  }}>대기중</span>
+                  <span style={{ fontSize: "0.7rem", color: t.textMuted }}>
+                    요청자: <b style={{ color: t.textAccent }}>{req.requester_id}</b>
+                  </span>
+                </div>
+                <div style={{
+                  fontSize: "0.82rem", color: t.text,
+                  background: t.borderSub, borderRadius: 6,
+                  padding: "8px 12px", lineHeight: 1.5,
+                }}>
+                  {req.purpose}
+                </div>
+              </div>
+              <button
+                onClick={() => handleTxApprove(req.request_id)}
+                disabled={txApproving === req.request_id}
+                style={{
+                  background: txApproving === req.request_id ? t.borderSub : "#0a2e0a",
+                  border: "1px solid #22c55e", color: "#22c55e",
+                  borderRadius: 8, padding: "8px 18px",
+                  fontSize: "0.78rem", fontWeight: 700,
+                  cursor: txApproving === req.request_id ? "not-allowed" : "pointer",
+                  fontFamily: "inherit", flexShrink: 0,
+                }}
+              >
+                {txApproving === req.request_id ? "처리 중..." : "✓ 승인"}
+              </button>
+            </div>
+            {txResults[req.request_id] && (
+              <div style={{
+                marginTop: 10,
+                background: txResults[req.request_id].error ? "#2d0a0a" : "#0a1a0a",
+                border: `1px solid ${txResults[req.request_id].error ? "#6b1a1a" : "#22c55e"}`,
+                borderRadius: 8, padding: "10px 14px", fontSize: "0.75rem",
+              }}>
+                {txResults[req.request_id].error ? (
+                  <span style={{ color: "#ff4d4d" }}>오류: {txResults[req.request_id].error}</span>
+                ) : (
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+                    <span style={{ color: "#22c55e" }}>✓ 승인 완료</span>
+                    <span style={{ color: t.textDim }}>레코드: <b style={{ color: t.text }}>{txResults[req.request_id].record_count}</b></span>
+                    <span
+                      onClick={() => handleDownload(txResults[req.request_id].download_url, txResults[req.request_id].filename)}
                       style={{ color: "#f59e0b", cursor: "pointer", fontWeight: 600 }}
                     >↓ 다운로드</span>
                   </div>

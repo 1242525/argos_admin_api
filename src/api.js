@@ -128,3 +128,45 @@ export const getMyPaymentRequests = async () => {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
+
+// ── transactions 승인 요청 ─────────────────────────────────
+export const requestTransactionsExport = async (purpose, tenantId = null, fmt = "csv") => {
+  const token = localStorage.getItem("admin_token");
+  const params = new URLSearchParams({ fmt });
+  if (tenantId) params.append("tenant_id", tenantId);
+  const res = await fetch(`${BASE_URL}/admin/export/transactions/request?${params}`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ purpose }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const getTransactionsExportRequests = async () => {
+  const token = localStorage.getItem("admin_token");
+  const res = await fetch(`${BASE_URL}/admin/export/transactions/requests`, {
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const approveTransactionsExport = async (requestId) => {
+  const token = localStorage.getItem("admin_token");
+  const res = await fetch(`${BASE_URL}/admin/export/transactions/approve/${requestId}`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const getMyTransactionsRequests = async () => {
+  const token = localStorage.getItem("admin_token");
+  const res = await fetch(`${BASE_URL}/admin/export/transactions/my-requests`, {
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
