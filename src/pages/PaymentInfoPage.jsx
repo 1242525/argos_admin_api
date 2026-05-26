@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "../ThemeContext.jsx";
 import { Card, SectionTitle, FilterBar, Table, Pill } from "../components/UI.jsx";
-import { exportPaymentInfo } from "../api.js";
+import { exportPaymentInfo, requestPaymentExport, getMyPaymentRequests } from "../api.js";
 
 const BASE_URL = "http://10.10.3.2:8001";
 
@@ -35,7 +35,39 @@ const PaymentInfoPage = ({ data: DATA }) => {
   const [sel, setSel]               = useState(null);
   const [exporting, setExporting]   = useState(false);
   const [exportResult, setExportResult] = useState(null);
+  const [showModal, setShowModal]       = useState(false);
+  const [purpose, setPurpose]           = useState("");
+  const [requesting, setRequesting]     = useState(false);
+  const [requestResult, setRequestResult] = useState(null);
+  const [myRequests, setMyRequests]         = useState([]);
   const handleF = (k, v) => setFilter(f => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    const fetchMyRequests = async () => {
+      try {
+        const data = await getMyPaymentRequests();
+        setMyRequests(data);
+      } catch (e) {}
+    };
+    fetchMyRequests();
+    const interval = setInterval(fetchMyRequests, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleRequest = async () => {
+    if (!purpose.trim()) return;
+    setRequesting(true);
+    setRequestResult(null);
+    try {
+      const result = await requestPaymentExport(purpose, filter.tenant_id || null);
+      setRequestResult(result);
+      setPurpose("");
+    } catch (e) {
+      setRequestResult({ error: e.message });
+    } finally {
+      setRequesting(false);
+    }
+  };
 
   const handleExport = async (fmt = "csv") => {
     setExporting(true);
@@ -95,12 +127,12 @@ const PaymentInfoPage = ({ data: DATA }) => {
             { key: "brand",     label: "Brand",   type: "select", options: brands },
           ]} values={filter} onChange={handleF} />
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => handleExport("csv")} disabled={exporting} style={{
-              background: exporting ? t.borderSub : "#1a2e1a", border: "1px solid #22c55e",
+            <button onClick={() => { setShowModal(true); setRequestResult(null); }} style={{
+              background: "#1a2e1a", border: "1px solid #22c55e",
               color: "#22c55e", borderRadius: 8, padding: "6px 14px",
-              fontSize: "0.75rem", fontWeight: 600, cursor: exporting ? "not-allowed" : "pointer",
+              fontSize: "0.75rem", fontWeight: 600, cursor: "pointer",
               fontFamily: "inherit",
-            }}>{exporting ? "..." : "↓ CSV"}</button>
+            }}>↓ CSV 요청</button>
             <button onClick={() => handleExport("json")} disabled={exporting} style={{
               background: exporting ? t.borderSub : "#1a1a2e", border: "1px solid #3b82f6",
               color: "#3b82f6", borderRadius: 8, padding: "6px 14px",
@@ -109,6 +141,102 @@ const PaymentInfoPage = ({ data: DATA }) => {
             }}>{exporting ? "..." : "↓ JSON"}</button>
           </div>
         </div>
+
+
+      {showModal && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.6)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            background: t.bgCard, border: `1px solid ${t.border}`,
+            borderRadius: 14, padding: "24px 28px", width: 480, maxWidth: "90vw",
+          }}>
+            <div style={{ fontSize: "1rem", fontWeight: 700, color: t.textTitle, marginBottom: 6 }}>
+              결제 데이터 Export 요청
+            </div>
+            <div style={{ fontSize: "0.75rem", color: t.textMuted, marginBottom: 16 }}>
+              Export 목적을 입력하면 담당자 승인 후 다운로드가 가능합니다.
+            </div>
+            <textarea
+              value={purpose}
+              onChange={e => setPurpose(e.target.value)}
+              placeholder="예: 2026년 5월 결제 데이터 월간 감사 목적으로 요청합니다."
+              rows={4}
+              style={{
+                width: "100%", background: t.borderSub,
+                border: `1px solid ${t.border}`, borderRadius: 8,
+                color: t.text, padding: "10px 12px",
+                fontSize: "0.82rem", fontFamily: "inherit",
+                resize: "vertical", boxSizing: "border-box",
+              }}
+            />
+            {requestResult && (
+              <div style={{
+                marginTop: 10,
+                background: requestResult.error ? "#2d0a0a" : "#0a1a0a",
+                border: `1px solid ${requestResult.error ? "#6b1a1a" : "#22c55e"}`,
+                borderRadius: 8, padding: "10px 12px", fontSize: "0.75rem",
+              }}>
+                {requestResult.error ? (
+                  <span style={{ color: "#ff4d4d" }}>오류: {requestResult.error}</span>
+                ) : (
+                  <span style={{ color: "#22c55e" }}>✓ 승인 요청이 전송됐습니다. (요청 번호: #{requestResult.request_id})</span>
+                )}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
+              <button onClick={() => { setShowModal(false); setPurpose(""); setRequestResult(null); }} style={{
+                background: t.borderSub, border: `1px solid ${t.border}`,
+                color: t.textDim, borderRadius: 8, padding: "7px 16px",
+                fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit",
+              }}>취소</button>
+              <button onClick={handleRequest} disabled={requesting || !purpose.trim()} style={{
+                background: requesting || !purpose.trim() ? t.borderSub : "#0a2e0a",
+                border: "1px solid #22c55e", color: "#22c55e",
+                borderRadius: 8, padding: "7px 16px",
+                fontSize: "0.78rem", fontWeight: 600,
+                cursor: requesting || !purpose.trim() ? "not-allowed" : "pointer",
+                fontFamily: "inherit",
+              }}>{requesting ? "전송 중..." : "요청 전송"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {myRequests.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          {myRequests.filter(r => r.status === "approved" && r.filename).map(req => (
+            <div key={req.request_id} style={{
+              background: "#0a1a0a", border: "1px solid #22c55e",
+              borderRadius: 10, padding: "10px 16px", marginBottom: 8,
+              fontSize: "0.75rem", display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap",
+            }}>
+              <span style={{ color: "#22c55e" }}>✓ 승인 완료</span>
+              <span style={{ color: t.textDim }}>요청 #{req.request_id}</span>
+              <span style={{ color: t.textDim }}>{req.purpose?.slice(0, 30)}{req.purpose?.length > 30 ? "..." : ""}</span>
+              <span style={{ color: t.textFaint }}>{req.approver_id}이 승인</span>
+              <span
+                onClick={() => handleDownload(`/admin/export/download/${req.filename}`, req.filename)}
+                style={{ color: "#f59e0b", cursor: "pointer", fontWeight: 600, marginLeft: "auto" }}
+              >↓ 다운로드</span>
+            </div>
+          ))}
+          {myRequests.filter(r => r.status === "pending").map(req => (
+            <div key={req.request_id} style={{
+              background: "#1a1500", border: "1px solid #f59e0b",
+              borderRadius: 10, padding: "10px 16px", marginBottom: 8,
+              fontSize: "0.75rem", display: "flex", gap: 16, alignItems: "center",
+            }}>
+              <span style={{ color: "#f59e0b" }}>⏳ 승인 대기 중</span>
+              <span style={{ color: t.textDim }}>요청 #{req.request_id}</span>
+              <span style={{ color: t.textDim }}>{req.purpose?.slice(0, 30)}{req.purpose?.length > 30 ? "..." : ""}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
         {exportResult && (
           <div style={{

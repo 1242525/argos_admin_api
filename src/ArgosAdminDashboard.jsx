@@ -17,6 +17,8 @@ import SystemPage    from "./pages/SystemPage.jsx";
 import AuditPage         from "./pages/AuditPage.jsx";
 import PaymentInfoPage   from "./pages/PaymentInfoPage.jsx";
 import TransactionsPage  from "./pages/TransactionsPage.jsx";
+import InquiriesPage    from "./pages/InquiriesPage.jsx";
+import ApprovalsPage    from "./pages/ApprovalsPage.jsx";
 import { getAdminSession } from "./authSession.js";
 
 import {
@@ -75,6 +77,8 @@ const PAGE_MAP = {
   audit:        AuditPage,
   payments:     PaymentInfoPage,
   transactions: TransactionsPage,
+  inquiries:    InquiriesPage,
+  approvals:    ApprovalsPage,
 };
 
 const AppInner = ({ onLogout }) => {

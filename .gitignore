@@ -17,4 +17,5 @@
 /tmp_cleanup_jenkins_builds.sh
 /tmp_deploy_admin_web.sh
 /tmp_fix_role.sql
-/tmp_update_jenkins_pipeline.py
+/tmp_update_jenkins_pipeline.pynode_modules/
+dist/

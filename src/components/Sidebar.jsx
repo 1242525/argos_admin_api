@@ -5,7 +5,7 @@ import { getAdminSession } from "../authSession.js";
 const Sidebar = ({ page, setPage, navOpen, setNavOpen, alertCount = 0 }) => {
   const { theme: t } = useTheme();
   const { role } = getAdminSession();
-  const visibleItems = NAV_ITEMS.filter(n => !n.adminOnly || role === "admin");
+  const visibleItems = NAV_ITEMS.filter(n => (!n.adminOnly || role === "admin") && (!n.complianceOnly || role === "compliance"));
 
   return (
     <aside style={{

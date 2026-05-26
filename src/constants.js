@@ -15,6 +15,8 @@ export const NAV_ITEMS = [
   { id: "audit",     icon: "⌘", label: "Audit / Change" },
   { id: "payments",     icon: "₩", label: "Payment Info",  adminOnly: true },
   { id: "transactions", icon: "↔", label: "Transactions",  adminOnly: true },
+  { id: "inquiries", icon: "✉", label: "1:1 문의" },
+  { id: "approvals",    icon: "✓", label: "Export 승인",   complianceOnly: true },
 ];
 
 export const SEV_COLOR = {
